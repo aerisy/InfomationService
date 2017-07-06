@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:cache="http://www.springframework.org/schema/cache"
+       xmlns:p="http://www.springframework.org/schema/p" xmlns:c="http://www.springframework.org/schema/c"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xmlns:aop="http://www.springframework.org/schema/aop" xmlns:util="http://www.springframework.org/schema/util"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+         http://www.springframework.org/schema/beans/spring-beans-4.0.xsd
+         http://www.springframework.org/schema/cache
+         http://www.springframework.org/schema/cache/spring-cache-4.0.xsd
+         http://www.springframework.org/schema/context
+         http://www.springframework.org/schema/context/spring-context-4.0.xsd http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util.xsd">
+
+    <!-- Shiro Filter -->
+    <context:property-placeholder location="classpath:shiro.properties"/>
+    <bean id="shiroFilter" class="org.apache.shiro.spring.web.ShiroFilterFactoryBean">
+        <property name="securityManager" ref="securityManager"/>
+        <!-- 设定用户的登录链接，这里为cas登录页面的链接地址可配置回调地址 -->
+        <property name="loginUrl" value="http://127.0.0.1:8080/cas/login?service=http://127.0.0.1:8888/hi/page"/>
+        <!--<property name="filters">
+            <util:map>
+                &lt;!&ndash; <entry key="authc" value-ref="authcFilter"/>
+                <entry key="captchaFilter" value-ref="captchaFilter"/> &ndash;&gt;
+                &lt;!&ndash; 添加casFilter到shiroFilter &ndash;&gt;
+                <entry key="cas" value-ref="casFilter"/>
+            <util:map>
+        </property>-->
+        <property name="filters">
+            <util:map>
+                <!-- 添加casFilter到shiroFilter -->
+                <entry key="casFilter" value-ref="casFilter"/>
+                <entry key="logoutFilter" value-ref="logoutFilter"/>
+            </util:map>
+        </property>
+        <property name="filterChainDefinitions">
+            <value>
+                /shiro-cas = casFilter
+                /logout = logoutFilter
+                /users/** = user
+            </value>
+        </property>
+    </bean>
+
+    <bean id="casFilter" class="org.apache.shiro.cas.CasFilter">
+        <!-- 配置验证错误时的失败页面 -->
+        <property name="failureUrl" value="/hi/message_fail"/>
+        <property name="successUrl" value="/hi/message"/>
+    </bean>
+
+    <bean id="logoutFilter" class="org.apache.shiro.web.filter.authc.LogoutFilter">
+        <!-- 配置验证错误时的失败页面 -->
+        <property name="redirectUrl" value="http://127.0.0.1:8080/cas/logout?service=http://127.0.0.1:8888/hi/message"/>
+    </bean>
+
+    <bean id="casRealm" class="com.xajiusuo.realm.UserRealm">
+        <!-- 认证通过后的默认角色 -->
+        <property name="defaultRoles" value="ROLE_USER"/>
+        <!-- cas服务端地址前缀 -->
+        <property name="casServerUrlPrefix" value="http://127.0.0.1:8080/cas"/>
+        <!-- 应用服务地址，用来接收cas服务端票据 -->
+        <property name="casService" value="http://127.0.0.1:8888/hi/mymain"/>
+    </bean>
+
+    <!-- Shiro's main business-tier object for web-enabled applications -->
+    <bean id="securityManager" class="org.apache.shiro.web.mgt.DefaultWebSecurityManager">
+        <!-- <property name="sessionManager" ref="sessionManager" /> -->
+        <property name="subjectFactory" ref="casSubjectFactory"></property>
+        <property name="realm" ref="casRealm"/>
+    </bean>
+
+    <bean id="casSubjectFactory" class="org.apache.shiro.cas.CasSubjectFactory"></bean>
+
+
+    <bean
+            class="org.apache.shiro.spring.security.interceptor.AuthorizationAttributeSourceAdvisor">
+        <property name="securityManager" ref="securityManager"/>
+    </bean>
+
+
+    <!-- <bean id="sessionManager" class="org.apache.shiro.web.session.mgt.DefaultWebSessionManager">
+        <property name="globalSessionTimeout" value="3600000" /> <property name="sessionDAO"
+        ref="sessionDAO" /> </bean> -->
+
+    <!-- <bean id="sessionDAO" class="com.distinct.web.session.redis.RedisSessionDAO">
+        <property name="sessionTimeout" value="1800000" /> <property name="redisManager"
+        ref="redisManager" /> </bean> -->
+
+    <bean id="lifecycleBeanPostProcessor" class="org.apache.shiro.spring.LifecycleBeanPostProcessor"></bean>
+
+    <bean
+            class="org.springframework.beans.factory.config.MethodInvokingFactoryBean">
+        <property name="staticMethod"
+                  value="org.apache.shiro.SecurityUtils.setSecurityManager"></property>
+        <property name="arguments" ref="securityManager"></property>
+    </bean>
+
+    <!--<description>Shiro安全配置</description>
+    <context:property-placeholder location="classpath:shiro.properties"/>
+    &lt;!&ndash; 缓存管理器 &ndash;&gt;
+   &lt;!&ndash; <bean id="cacheManager" class="com.whty.framework.base.common.cache.SpringCacheManagerWrapper">
+        <property name="cacheManager" ref="springCacheManager"/>
+    </bean>&ndash;&gt;
+
+    &lt;!&ndash; Realm实现 &ndash;&gt;
+    <bean id="casRealm" class="com.banana.realm.UserRealm">
+        <property name="cachingEnabled" value="true"/>
+        <property name="authenticationCachingEnabled" value="true"/>
+        <property name="authenticationCacheName" value="authenticationCache"/>
+        <property name="authorizationCachingEnabled" value="true"/>
+        <property name="authorizationCacheName" value="authorizationCache"/>
+        &lt;!&ndash; CAS Server &ndash;&gt;
+        <property name="casServerUrlPrefix" value="http://127.0.0.1:8080/cas"/>
+        &lt;!&ndash; 客户端的回调地址设置，必须和下面的shiro-cas过滤器拦截的地址一致 &ndash;&gt;
+        <property name="casService" value="http://127.0.0.1:8888/"/>
+    </bean>
+
+    <bean id="casSubjectFactory" class="org.apache.shiro.cas.CasSubjectFactory"/>
+    &lt;!&ndash; 安全管理器 &ndash;&gt;
+    <bean id="securityManager" class="org.apache.shiro.web.mgt.DefaultWebSecurityManager">
+        <property name="realm" ref="casRealm"/>
+        &lt;!&ndash; <property name="sessionManager" ref="sessionManager"/> &ndash;&gt;
+        &lt;!&ndash;<property name="cacheManager" ref="cacheManager"/>&ndash;&gt;
+        &lt;!&ndash; sessionMode参数设置为native时，那么shrio就将用户的基本认证信息保存到缺省名称为shiro-activeSessionCache 的Cache中 &ndash;&gt;
+        &lt;!&ndash;<property name="sessionMode" value="native" />&ndash;&gt;
+        <property name="subjectFactory" ref="casSubjectFactory"/>
+    </bean>
+
+    &lt;!&ndash; 相当于调用SecurityUtils.setSecurityManager(securityManager) &ndash;&gt;
+    <bean class="org.springframework.beans.factory.config.MethodInvokingFactoryBean">
+        <property name="staticMethod" value="org.apache.shiro.SecurityUtils.setSecurityManager"/>
+        <property name="arguments" ref="securityManager"/>
+    </bean>
+
+    <bean id="casFilter" class="org.apache.shiro.cas.CasFilter">
+        &lt;!&ndash; 配置验证错误时的失败页面  &ndash;&gt;
+        <property name="failureUrl" value="http://127.0.0.1:8888/hi/page2"/>
+        <property name="successUrl" value="http://127.0.0.1:8888/hi/page"/>
+    </bean>
+
+    <bean id="shiroFilter" class="org.apache.shiro.spring.web.ShiroFilterFactoryBean">
+        <property name="securityManager" ref="securityManager" />
+        &lt;!&ndash; 设定角色的登录链接，这里为cas登录页面的链接可配置回调地址  &ndash;&gt;
+        <property name="loginUrl" value="http://127.0.0.1:8080/cas?service=http://127.0.0.1:8888/hi/message" />
+        <property name="successUrl" value="/hi/message" />
+        <property name="unauthorizedUrl" value="/hi/page"/>
+        <property name="filters">
+            <util:map>
+                &lt;!&ndash; <entry key="authc" value-ref="authcFilter"/>
+                <entry key="captchaFilter" value-ref="captchaFilter"/> &ndash;&gt;
+                &lt;!&ndash; 添加casFilter到shiroFilter &ndash;&gt;
+                <entry key="cas" value-ref="casFilter"/>
+            </util:map>
+        </property>
+        <property name="filterChainDefinitions">
+            <value>
+                /logout = logout
+                /login = caslogin
+                /** = user
+            </value>
+        </property>
+    </bean>
+
+    <bean id="caslogin" class="org.apache.shiro.cas.CasFilter">
+        &lt;!&ndash; 配置验证错误时的失败页面 &ndash;&gt;
+        <property name="failureUrl" value="/hi/message" />
+        <property name="successUrl" value="/hi/message" />
+    </bean>
+
+
+    &lt;!&ndash;保证实现了Shiro内部lifecycle函数的bean执行 &ndash;&gt;
+    <bean id="lifecycleBeanPostProcessor" class="org.apache.shiro.spring.LifecycleBeanPostProcessor" />
+-->
+</beans>
