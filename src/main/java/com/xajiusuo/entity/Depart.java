@@ -9,7 +9,7 @@ import javax.persistence.*;
  */
 @Entity
 @Table(name = "basic_depart")
-public class Depart {
+public class Depart implements Cloneable {
 
     @Id
     @GeneratedValue(generator = "system-uuid")
@@ -52,5 +52,9 @@ public class Depart {
 
     public void setPid(String pid) {
         this.pid = pid;
+    }
+
+    public Object clone() throws CloneNotSupportedException{
+        return super.clone();
     }
 }
